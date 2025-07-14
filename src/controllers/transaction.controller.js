@@ -5,27 +5,30 @@ import { asyncHandler } from "../utils/asyncHandler.js"
 import { Transaction } from "../model/transaction.model.js";
 
 const addTransaction = asyncHandler(async (req, res) => {
-    const { amount, type, merchant, timestamp } = req.body;
+    const transactions = req.body;
 
-    if (!amount || !type || !merchant || !timestamp) {
-        throw new ApiError(400, "All fields are required");
-    }
-    if (!['debit', 'credit'].includes(type)) {
-        throw new ApiError(400, "Type must be either 'debit' or 'credit'");
+    if (!Array.isArray(transactions) || transactions.length === 0) {
+        throw new ApiError(400, "A non-empty list of transactions is required");
     }
 
-    const transaction = new Transaction({
-        amount,
-        type,
-        merchant,
-        timestamp
-    });
-    await transaction.save();
-    res.status(201).json(new ApiResponse(201, transaction, "Transaction added successfully"));
-})
+    const validated = transactions.filter(tx =>
+        tx.amount !== undefined &&
+        ['debit', 'credit'].includes(tx.type) &&
+        typeof tx.merchant === 'string' &&
+        typeof tx.timestamp === 'number'
+    );
+
+    if (validated.length === 0) {
+        throw new ApiError(400, "No valid transactions provided");
+    }
+
+    const saved = await Transaction.insertMany(validated);
+    res.status(201).json(new ApiResponse(201, saved, `${saved.length} transactions added`));
+});
+
 
 const getAllTransactions = asyncHandler(async (req, res) => {
-    const transactions = await Transaction.find();
+    const transactions = await Transaction.find().sort({ timestamp: -1 });
     res.status(200).json(new ApiResponse(200, transactions, "Transactions retrieved successfully"));
 });
 

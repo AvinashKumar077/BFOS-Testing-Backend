@@ -1,14 +1,18 @@
-import 'dotenv/config'
-import connectDB from "./db/db.js";
 import { app } from './app.js';
+import serverless from 'serverless-http';
+import connectDB from './db/db.js';
+import 'dotenv/config.js';
 
-connectDB()
-    .then(() => {
-        app.on("error", (error) => {
-            console.error("Error in starting server !!", error)
-        })
-        app.listen(process.env.PORT || 8000, () => {
-            console.log(`Server is running on port ${process.env.PORT}`)
-        })
-    })
-    .catch((error) => console.error("Mongo DB connection error !!", error))
+// Track DB connection status (to avoid reconnecting every request)
+let isConnected = false;
+
+const handler = async (req, res) => {
+    if (!isConnected) {
+        await connectDB();
+        isConnected = true;
+    }
+
+    return serverless(app)(req, res);
+};
+
+export default handler;
